@@ -724,6 +724,7 @@ export default function DashboardPage() {
   const [roleLoading,    setRoleLoading]   = useState(false);
   const [allUsers,       setAllUsers]      = useState<UserRecord[]>([]);
   const [usersLoading,   setUsersLoading]  = useState(false);
+  const [usersError,     setUsersError]    = useState("");
   const [userSearch,     setUserSearch]    = useState("");
   const [userRoleMsg,    setUserRoleMsg]   = useState<Record<string, string>>({});
   const [userRoleLoad,   setUserRoleLoad]  = useState<Record<string, boolean>>({});
@@ -772,6 +773,14 @@ export default function DashboardPage() {
       });
   }, [user]);
 
+  // Auto-load all users when admin tab opens
+  useEffect(() => {
+    if (tab === "admin" && mentor && allUsers.length === 0 && !usersLoading) {
+      loadAllUsers();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
   // Fetch community leaderboard from Supabase game_sessions table
   useEffect(() => {
     if (!user) return;
@@ -807,9 +816,14 @@ export default function DashboardPage() {
 
   async function loadAllUsers() {
     setUsersLoading(true);
+    setUsersError("");
     const { data, error } = await supabase.rpc("list_all_users");
     setUsersLoading(false);
-    if (!error && data) setAllUsers(data as UserRecord[]);
+    if (error) {
+      setUsersError(error.message || "Failed to load users. The list_all_users RPC may not exist — see SQL below.");
+    } else if (data) {
+      setAllUsers(data as UserRecord[]);
+    }
   }
 
   async function handleUserRole(u: UserRecord, grant: boolean) {
@@ -1474,9 +1488,43 @@ export default function DashboardPage() {
                       {usersLoading ? "Loading…" : allUsers.length > 0 ? `${allUsers.length} users` : "Load Users"}
                     </button>
                   </div>
-                  {allUsers.length === 0 && !usersLoading && (
-                    <div className="users-empty">
-                      Click <strong style={{ color:"#a1a1aa" }}>Load Users</strong> to fetch all registered accounts.
+                  {allUsers.length === 0 && !usersLoading && !usersError && (
+                    <div className="users-empty">Loading registered accounts…</div>
+                  )}
+                  {usersError && (
+                    <div style={{ padding:"24px 20px" }}>
+                      <div style={{ background:"rgba(244,63,94,.07)", border:"1px solid rgba(244,63,94,.2)", borderRadius:10, padding:"14px 18px", marginBottom:16 }}>
+                        <div style={{ fontSize:12, fontWeight:700, color:"#f43f5e", marginBottom:4 }}>Could not load users</div>
+                        <div style={{ fontSize:11.5, color:"#71717a" }}>{usersError}</div>
+                      </div>
+                      <div style={{ fontSize:11, color:"#52525b", lineHeight:1.7 }}>
+                        To enable this feature, run this SQL in your{" "}
+                        <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" style={{ color:"#22d3ee", textDecoration:"none" }}>
+                          Supabase dashboard
+                        </a>
+                        {" "}→ SQL Editor:
+                      </div>
+                      <pre style={{ marginTop:10, padding:"12px 16px", background:"rgba(255,255,255,.03)", border:"1px solid rgba(255,255,255,.06)", borderRadius:8, fontSize:11, color:"#a1a1aa", overflowX:"auto", lineHeight:1.6 }}>{`create or replace function list_all_users()
+returns table (
+  id uuid, email text, display_name text,
+  role text, created_at timestamptz
+)
+language plpgsql security definer as $$
+begin
+  return query
+    select
+      u.id,
+      u.email,
+      coalesce(u.raw_user_meta_data->>'display_name',
+               u.raw_user_meta_data->>'full_name',
+               split_part(u.email,'@',1)) as display_name,
+      coalesce(u.raw_app_meta_data->>'role',
+               u.raw_user_meta_data->>'role', 'student') as role,
+      u.created_at
+    from auth.users u
+    order by u.created_at desc;
+end;
+$$;`}</pre>
                     </div>
                   )}
                   {usersLoading && (

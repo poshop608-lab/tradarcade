@@ -35,10 +35,13 @@ export function GameSlotGrid({
     }
   }, [mentorId]);
 
-  // Use localStorage override if set, otherwise default from server
-  const visibleGames = mounted && activeIds !== null
-    ? allGames.filter((g) => activeIds.includes(g.id))
-    : defaultGames;
+  // Mentor's defaultGames is the authoritative list — localStorage can only
+  // reduce it further (e.g. admin toggling games off), never expand it.
+  const defaultIds = new Set(defaultGames.map((g) => g.id));
+  const visibleGames =
+    mounted && activeIds !== null
+      ? allGames.filter((g) => activeIds.includes(g.id) && defaultIds.has(g.id))
+      : defaultGames;
 
   const gamesCount = visibleGames.length;
 
