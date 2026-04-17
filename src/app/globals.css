@@ -38,9 +38,9 @@
   --blue:  #3b82f6;
 
   /* Fonts */
-  --font-d: var(--font-geist-sans), system-ui, sans-serif;
+  --font-d: var(--font-jakarta), system-ui, sans-serif;
   --font-m: var(--font-geist-mono), monospace;
-  --font-b: var(--font-geist-sans), system-ui, sans-serif;
+  --font-b: var(--font-jakarta), system-ui, sans-serif;
 }
 
 @theme inline {

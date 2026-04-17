@@ -90,7 +90,7 @@ const CSS = `
 @keyframes ms-fade  { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
 @keyframes ms-spin  { to{transform:rotate(360deg)} }
 
-.ms-wrap { animation: ms-fade .35s ease both; }
+.ms-wrap { animation: ms-fade .35s ease both; font-family:var(--font-jakarta,-apple-system,system-ui,sans-serif); }
 
 /* ── section label */
 .ms-sec-lbl {
@@ -102,15 +102,16 @@ const CSS = `
 
 /* ── my mentorship banner */
 .ms-mine {
-  background:linear-gradient(135deg,rgba(34,211,238,.06),rgba(129,140,248,.04));
-  border:1px solid rgba(34,211,238,.18); border-radius:16px;
+  background:linear-gradient(135deg,rgba(34,211,238,.07),rgba(129,140,248,.05));
+  border:1px solid rgba(34,211,238,.22); border-radius:18px;
   padding:20px 24px; margin-bottom:28px;
   display:flex; align-items:center; justify-content:space-between; gap:20px;
   position:relative; overflow:hidden;
+  box-shadow:0 0 40px rgba(34,211,238,.06), 0 8px 32px rgba(0,0,0,.3);
 }
 .ms-mine::before {
   content:''; position:absolute; top:0; left:0; right:0; height:2px;
-  background:linear-gradient(90deg,transparent,var(--ms-accent,#22d3ee),transparent);
+  background:linear-gradient(90deg,transparent,var(--ms-accent,#22d3ee),rgba(129,140,248,.8),transparent);
 }
 .ms-mine-av {
   width:52px; height:52px; border-radius:14px; flex-shrink:0;
@@ -248,19 +249,21 @@ const CSS = `
 
 /* ── mentorship cards grid */
 .ms-grid {
-  display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
-  gap:14px;
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr));
+  gap:16px;
 }
 .ms-card {
-  background:#111113; border:1px solid rgba(255,255,255,.07);
-  border-radius:16px; overflow:hidden; cursor:pointer;
-  transition:transform .2s, box-shadow .2s, border-color .2s;
+  background:linear-gradient(160deg,#131316,#0f1012);
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:18px; overflow:hidden; cursor:pointer;
+  transition:transform .22s, box-shadow .22s, border-color .22s;
   display:flex; flex-direction:column;
+  position:relative;
 }
 .ms-card:hover {
-  transform:translateY(-3px);
-  border-color:var(--mc-accent,rgba(34,211,238,.3));
-  box-shadow:0 12px 40px rgba(0,0,0,.45), 0 0 0 1px var(--mc-accent,rgba(34,211,238,.15));
+  transform:translateY(-5px);
+  border-color:var(--mc-accent,rgba(34,211,238,.35));
+  box-shadow:0 20px 56px rgba(0,0,0,.5), 0 0 0 1px var(--mc-accent,rgba(34,211,238,.2)), 0 0 40px var(--mc-dim,rgba(34,211,238,.05));
 }
 .ms-card-top {
   padding:20px 20px 14px;
@@ -271,22 +274,45 @@ const CSS = `
   content:''; position:absolute; top:0; left:0; right:0; height:2px;
   background:linear-gradient(90deg,transparent,var(--mc-accent,#22d3ee),transparent);
 }
+.ms-card-top::after {
+  content:''; position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none;
+  background:radial-gradient(ellipse 80% 60% at 20% 0%, var(--mc-dim,rgba(34,211,238,.04)), transparent);
+}
 .ms-card-av {
   width:48px; height:48px; border-radius:13px; flex-shrink:0;
   display:flex; align-items:center; justify-content:center;
   font-size:20px; font-weight:900; color:#09090b;
+  box-shadow:0 4px 12px rgba(0,0,0,.3);
 }
 .ms-card-info { flex:1; min-width:0; }
-.ms-card-name { font-size:15px; font-weight:800; color:#fafafa; letter-spacing:-.02em; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ms-card-name { font-size:15px; font-weight:800; color:#fafafa; letter-spacing:-.025em; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ms-card-mentor { font-size:11px; color:#71717a; }
 .ms-card-body { padding:0 20px 14px; flex:1; }
-.ms-card-desc { font-size:12px; color:#71717a; line-height:1.6; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; margin-bottom:10px; }
+.ms-card-desc { font-size:12px; color:#71717a; line-height:1.65; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; margin-bottom:10px; }
 .ms-card-tags { display:flex; gap:6px; flex-wrap:wrap; }
 .ms-tag { padding:3px 9px; border-radius:20px; font-size:9.5px; font-weight:700; }
-.ms-card-foot { padding:12px 20px; border-top:1px solid rgba(255,255,255,.05); display:flex; align-items:center; justify-content:space-between; }
-.ms-card-stats { font-size:11px; color:#52525b; }
-.ms-card-action { display:flex; align-items:center; gap:5px; padding:6px 14px; border-radius:8px; font-size:11.5px; font-weight:700; background:var(--mc-dim); border:1px solid var(--mc-border); color:var(--mc-accent); transition:background .15s; }
-.ms-card:hover .ms-card-action { background:var(--mc-hover); }
+.ms-card-foot {
+  padding:13px 18px; border-top:1px solid rgba(255,255,255,.05);
+  display:flex; align-items:center; justify-content:space-between;
+  background:rgba(255,255,255,.015);
+}
+.ms-card-chips { display:flex; align-items:center; gap:6px; }
+.ms-stat-chip {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:4px 10px; border-radius:20px; font-size:10px; font-weight:700;
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); color:#52525b;
+}
+.ms-stat-chip svg { opacity:.55; }
+.ms-card-action {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:6px 14px; border-radius:9px; font-size:11.5px; font-weight:700;
+  background:var(--mc-dim); border:1px solid var(--mc-border); color:var(--mc-accent);
+  transition:all .18s;
+}
+.ms-card:hover .ms-card-action {
+  background:var(--mc-hover);
+  box-shadow:0 0 14px var(--mc-dim);
+}
 
 /* ── detail drawer */
 .ms-detail {
@@ -1176,7 +1202,20 @@ export default function MentorshipsTab({ user, isMentor, displayName }: Props) {
                     </div>
                   </div>
                   <div className="ms-card-foot">
-                    <span className="ms-card-stats">Since {fmtDate(m.created_at)}</span>
+                    <div className="ms-card-chips">
+                      {m.active_game_ids?.length > 0 && (
+                        <span className="ms-stat-chip">
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 10v4M10 12h4"/></svg>
+                          {m.active_game_ids.length} games
+                        </span>
+                      )}
+                      {m.rules?.filter((r: string) => r.trim()).length > 0 && (
+                        <span className="ms-stat-chip">
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                          {m.rules.filter((r: string) => r.trim()).length} rules
+                        </span>
+                      )}
+                    </div>
                     <div className="ms-card-action">
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                       {selected?.id === m.id ? "Close" : "View"}
