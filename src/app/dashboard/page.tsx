@@ -212,7 +212,17 @@ const CATS = [
 
 const DIFF_COLOR: Record<string, string> = { Easy:"#22c55e", Medium:"#f59e0b", Hard:"#f43f5e" };
 
-type Tab = "games" | "leaderboard" | "stats" | "mentorships" | "admin";
+type Tab = "games" | "leaderboard" | "stats" | "mentorships" | "admin" | "community";
+
+type MembershipInfo = {
+  id: string; name: string; accent_color: string; description: string;
+  logo: string; tagline: string; rules: string[]; active_game_ids: string[];
+  mentor_name: string; social_link: string; category: string;
+};
+
+type UserRecord = {
+  id: string; email: string; display_name: string; role: string; created_at: string;
+};
 
 // ── nav SVGs ──────────────────────────────────────────────────────────────────
 const NAV = {
@@ -295,22 +305,160 @@ const CSS = `
 /* ── main ── */
 .mn  { flex:1; min-width:0; display:flex; flex-direction:column; min-height:100vh; }
 .tb  {
-  height:54px; display:flex; align-items:center; justify-content:space-between;
-  padding:0 28px; border-bottom:1px solid rgba(255,255,255,.06);
-  background:rgba(9,9,11,.9); backdrop-filter:blur(14px);
+  height:62px; display:flex; align-items:center; justify-content:space-between;
+  padding:0 28px; border-bottom:1px solid rgba(255,255,255,.07);
+  background:rgba(8,9,12,.92); backdrop-filter:blur(18px);
   position:sticky; top:0; z-index:40; flex-shrink:0;
+  gap:16px;
 }
-.tb-t  { font-size:14px; font-weight:700; color:#fafafa; letter-spacing:-.01em; }
+.tb::after {
+  content:''; position:absolute; bottom:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg,transparent 5%,rgba(34,211,238,.18) 30%,rgba(129,140,248,.12) 70%,transparent 95%);
+  pointer-events:none;
+}
+.tb-left { display:flex; align-items:center; gap:12px; min-width:0; }
+.tb-icon {
+  width:34px; height:34px; border-radius:9px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(34,211,238,.08); border:1px solid rgba(34,211,238,.15);
+  color:#22d3ee;
+}
+.tb-t  { font-size:15px; font-weight:800; color:#fafafa; letter-spacing:-.02em; }
 .tb-s  { font-size:10.5px; color:#3f3f46; margin-top:1px; }
+.tb-right { display:flex; align-items:center; gap:10px; flex-shrink:0; }
 .tb-srch {
   display:flex; align-items:center; gap:7px;
   background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07);
-  border-radius:8px; padding:6px 12px; transition:border-color .2s;
+  border-radius:9px; padding:7px 13px; transition:border-color .2s, box-shadow .2s;
 }
-.tb-srch:focus-within { border-color:rgba(34,211,238,.3); }
+.tb-srch:focus-within { border-color:rgba(34,211,238,.3); box-shadow:0 0 0 3px rgba(34,211,238,.06); }
 .tb-srch input { background:none; border:none; outline:none; color:#fafafa; font-size:12.5px; font-family:inherit; width:190px; transition:width .2s; }
 .tb-srch input:focus { width:230px; }
 .tb-srch input::placeholder { color:#3f3f46; }
+.tb-role {
+  display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:20px;
+  font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.07em;
+  flex-shrink:0;
+}
+.tb-role-mentor { background:rgba(217,70,239,.1); border:1px solid rgba(217,70,239,.25); color:#d946ef; }
+.tb-role-member { background:rgba(34,211,238,.1); border:1px solid rgba(34,211,238,.25); color:#22d3ee; }
+.tb-user-chip {
+  display:flex; align-items:center; gap:7px; padding:5px 10px 5px 5px;
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07);
+  border-radius:20px; flex-shrink:0;
+}
+.tb-av {
+  width:26px; height:26px; border-radius:50%;
+  background:linear-gradient(135deg,rgba(34,211,238,.25),rgba(217,70,239,.2));
+  border:1px solid rgba(34,211,238,.25); display:flex; align-items:center; justify-content:center;
+  font-size:9.5px; font-weight:800; color:#22d3ee; flex-shrink:0;
+}
+.tb-uname { font-size:12px; font-weight:700; color:#a1a1aa; }
+
+/* ── role management form */
+.role-form-wrap { background:#111113; border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:22px; margin-bottom:20px; }
+.role-form-row  { display:flex; gap:8px; align-items:center; }
+.role-input {
+  flex:1; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.09);
+  border-radius:9px; padding:10px 14px; color:#fafafa; font-size:13px;
+  font-family:inherit; outline:none; transition:border-color .15s;
+}
+.role-input:focus { border-color:rgba(34,211,238,.4); }
+.role-input::placeholder { color:#3f3f46; }
+.role-btn-grant { padding:10px 18px; border-radius:9px; font-size:12.5px; font-weight:700; border:1px solid rgba(34,211,238,.3); background:rgba(34,211,238,.09); color:#22d3ee; cursor:pointer; font-family:inherit; transition:all .15s; flex-shrink:0; }
+.role-btn-grant:hover { background:rgba(34,211,238,.16); }
+.role-btn-revoke { padding:10px 18px; border-radius:9px; font-size:12.5px; font-weight:700; border:1px solid rgba(244,63,94,.25); background:rgba(244,63,94,.07); color:#f43f5e; cursor:pointer; font-family:inherit; transition:all .15s; flex-shrink:0; }
+.role-btn-revoke:hover { background:rgba(244,63,94,.14); }
+.role-msg-ok  { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:#22c55e; margin-top:10px; }
+.role-msg-err { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:#f43f5e; margin-top:10px; }
+
+/* ── users panel */
+.users-panel { background:#111113; border:1px solid rgba(255,255,255,.08); border-radius:14px; overflow:hidden; margin-bottom:20px; }
+.users-head  { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 20px; border-bottom:1px solid rgba(255,255,255,.06); }
+.users-search{ flex:1; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:8px; padding:8px 12px 8px 32px; color:#fafafa; font-size:12.5px; font-family:inherit; outline:none; transition:border-color .15s; }
+.users-search:focus { border-color:rgba(34,211,238,.35); }
+.users-search::placeholder { color:#3f3f46; }
+.users-search-wrap { position:relative; flex:1; }
+.users-search-wrap svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); pointer-events:none; }
+.users-reload { display:inline-flex; align-items:center; gap:5px; padding:7px 14px; border-radius:8px; font-size:11.5px; font-weight:700; border:1px solid rgba(255,255,255,.09); background:rgba(255,255,255,.04); color:#a1a1aa; cursor:pointer; font-family:inherit; transition:all .15s; flex-shrink:0; }
+.users-reload:hover { background:rgba(255,255,255,.08); color:#fafafa; }
+.users-tbl  { width:100%; border-collapse:collapse; }
+.users-tbl th { padding:9px 16px; text-align:left; font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#3f3f46; background:rgba(255,255,255,.02); border-bottom:1px solid rgba(255,255,255,.05); }
+.users-tbl td { padding:11px 16px; border-bottom:1px solid rgba(255,255,255,.04); vertical-align:middle; }
+.users-tbl tr:last-child td { border-bottom:none; }
+.users-tbl tr:hover td { background:rgba(255,255,255,.02); }
+.u-av { width:32px; height:32px; border-radius:9px; background:rgba(34,211,238,.1); border:1px solid rgba(34,211,238,.2); display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#22d3ee; flex-shrink:0; }
+.u-name { font-size:13px; font-weight:700; color:#fafafa; }
+.u-email { font-size:11px; color:#52525b; margin-top:1px; }
+.u-badge { display:inline-flex; align-items:center; padding:2px 9px; border-radius:20px; font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
+.u-badge-mentor  { background:rgba(217,70,239,.1); border:1px solid rgba(217,70,239,.25); color:#d946ef; }
+.u-badge-student { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); color:#52525b; }
+.u-acts { display:flex; align-items:center; gap:6px; }
+.u-btn-grant  { padding:5px 11px; border-radius:7px; font-size:10.5px; font-weight:700; border:1px solid rgba(34,211,238,.25); background:rgba(34,211,238,.07); color:#22d3ee; cursor:pointer; font-family:inherit; transition:all .15s; white-space:nowrap; }
+.u-btn-grant:hover { background:rgba(34,211,238,.14); }
+.u-btn-grant:disabled { opacity:.4; cursor:not-allowed; }
+.u-btn-revoke { padding:5px 11px; border-radius:7px; font-size:10.5px; font-weight:700; border:1px solid rgba(244,63,94,.2); background:rgba(244,63,94,.06); color:#f43f5e; cursor:pointer; font-family:inherit; transition:all .15s; white-space:nowrap; }
+.u-btn-revoke:hover { background:rgba(244,63,94,.12); }
+.u-btn-revoke:disabled { opacity:.4; cursor:not-allowed; }
+.u-msg-ok  { font-size:10.5px; font-weight:600; color:#22c55e; white-space:nowrap; }
+.u-msg-err { font-size:10.5px; font-weight:600; color:#f43f5e; white-space:nowrap; }
+.users-empty { padding:40px 20px; text-align:center; color:#3f3f46; font-size:13px; }
+
+/* ── community tab */
+.cm-hero {
+  border-radius:18px; padding:24px 28px; margin-bottom:24px;
+  position:relative; overflow:hidden;
+  display:flex; align-items:center; gap:20px;
+}
+.cm-hero::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg,transparent,var(--cm-accent,#22d3ee),transparent);
+}
+.cm-hero::after {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(ellipse 70% 80% at 10% 0%, var(--cm-dim,rgba(34,211,238,.05)), transparent);
+}
+.cm-av {
+  width:64px; height:64px; border-radius:16px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:26px; font-weight:900; color:#09090b;
+  box-shadow:0 6px 20px rgba(0,0,0,.4);
+  position:relative; z-index:1;
+}
+.cm-info { flex:1; min-width:0; position:relative; z-index:1; }
+.cm-name { font-size:22px; font-weight:800; letter-spacing:-.03em; color:#fafafa; margin-bottom:3px; }
+.cm-tag  { font-size:12px; color:#a1a1aa; font-weight:500; }
+.cm-meta { display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap; }
+.cm-pill { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:700; }
+.cm-status { position:relative; z-index:1; }
+.cm-active { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:20px; font-size:11px; font-weight:700; background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.25); color:#22c55e; }
+.cm-active-dot { width:7px; height:7px; border-radius:50%; background:#22c55e; box-shadow:0 0 6px rgba(34,197,94,.6); }
+.cm-section-lbl { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#3f3f46; margin-bottom:12px; display:flex; align-items:center; gap:10px; }
+.cm-section-lbl::after { content:''; flex:1; height:1px; background:rgba(255,255,255,.05); }
+.cm-games-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; margin-bottom:28px; }
+.cm-game-card {
+  background:#111113; border:1px solid rgba(255,255,255,.07); border-radius:12px;
+  padding:14px 16px; display:flex; align-items:center; gap:12px;
+  transition:border-color .18s, background .18s;
+}
+.cm-game-card:hover { border-color:var(--cg-accent,rgba(34,211,238,.3)); background:rgba(255,255,255,.025); }
+.cm-game-icon { width:36px; height:36px; border-radius:9px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.cm-game-name { font-size:12.5px; font-weight:700; color:#fafafa; margin-bottom:2px; }
+.cm-game-cat  { font-size:10px; color:#71717a; }
+.cm-play-btn {
+  margin-left:auto; display:flex; align-items:center; gap:4px;
+  padding:5px 12px; border-radius:7px; font-size:11px; font-weight:700;
+  background:var(--cg-dim); border:1px solid var(--cg-border); color:var(--cg-accent);
+  text-decoration:none; transition:background .15s; flex-shrink:0;
+}
+.cm-game-card:hover .cm-play-btn { background:var(--cg-hover); }
+.cm-rules { display:flex; flex-direction:column; gap:8px; margin-bottom:28px; }
+.cm-rule { display:flex; align-items:flex-start; gap:10px; padding:11px 14px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); border-radius:9px; }
+.cm-rule-n { font-size:10px; font-weight:800; color:#52525b; min-width:18px; }
+.cm-rule-t { font-size:12.5px; color:#a1a1aa; line-height:1.5; }
+.cm-member-card { background:#111113; border:1px solid rgba(255,255,255,.07); border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px; }
+.cm-member-av { width:40px; height:40px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; border:1px solid rgba(34,211,238,.25); }
+.cm-disc-tag { font-family:monospace; font-size:11.5px; background:rgba(88,101,242,.12); border:1px solid rgba(88,101,242,.25); border-radius:6px; padding:2px 8px; color:#818cf8; }
 
 .ct { flex:1; padding:28px; overflow-y:auto; }
 
@@ -567,6 +715,15 @@ export default function DashboardPage() {
   const [collapsed,      setCollapsed]     = useState<Record<string,boolean>>({});
   const [banned,         setBanned]        = useState<Set<string>>(new Set());
   const [recommendedIds, setRecommendedIds]= useState<Set<string>>(new Set());
+  const [myMembership,   setMyMembership]  = useState<MembershipInfo | null>(null);
+  const [adminEmail,     setAdminEmail]    = useState("");
+  const [roleMsg,        setRoleMsg]       = useState("");
+  const [roleLoading,    setRoleLoading]   = useState(false);
+  const [allUsers,       setAllUsers]      = useState<UserRecord[]>([]);
+  const [usersLoading,   setUsersLoading]  = useState(false);
+  const [userSearch,     setUserSearch]    = useState("");
+  const [userRoleMsg,    setUserRoleMsg]   = useState<Record<string, string>>({});
+  const [userRoleLoad,   setUserRoleLoad]  = useState<Record<string, boolean>>({});
 
   useScrollReveal(contentRef);
 
@@ -592,6 +749,55 @@ export default function DashboardPage() {
       setRecommendedIds(ids);
     });
   }, [user]);
+
+  useEffect(() => {
+    if (!user || isMentor(user)) return;
+    supabase.from("mentorship_join_requests")
+      .select("mentorship_id")
+      .eq("email", user.email ?? "")
+      .eq("status", "accepted")
+      .limit(1)
+      .maybeSingle()
+      .then(async ({ data }) => {
+        if (data?.mentorship_id) {
+          const { data: ms } = await supabase.from("mentorships").select("*").eq("id", data.mentorship_id).single();
+          if (ms) setMyMembership(ms as MembershipInfo);
+        }
+      });
+  }, [user]);
+
+  async function handleSetRole(email: string, grant: boolean) {
+    if (!email.trim()) { setRoleMsg("Enter an email address first."); return; }
+    setRoleLoading(true); setRoleMsg("");
+    const { data, error } = await supabase.rpc("set_user_mentor_role", {
+      target_email: email.trim(), grant_role: grant,
+    });
+    setRoleLoading(false);
+    if (error) setRoleMsg(`Error: ${error.message}`);
+    else if (data?.error) setRoleMsg(`Error: ${data.error}`);
+    else setRoleMsg(data?.message ?? "Done");
+    setTimeout(() => setRoleMsg(""), 6000);
+  }
+
+  async function loadAllUsers() {
+    setUsersLoading(true);
+    const { data, error } = await supabase.rpc("list_all_users");
+    setUsersLoading(false);
+    if (!error && data) setAllUsers(data as UserRecord[]);
+  }
+
+  async function handleUserRole(u: UserRecord, grant: boolean) {
+    setUserRoleLoad(p => ({ ...p, [u.id]: true }));
+    setUserRoleMsg(p => ({ ...p, [u.id]: "" }));
+    const { data, error } = await supabase.rpc("set_user_mentor_role", {
+      target_email: u.email, grant_role: grant,
+    });
+    setUserRoleLoad(p => ({ ...p, [u.id]: false }));
+    const msg = error ? `Error: ${error.message}` : (data?.error ? `Error: ${data.error}` : (grant ? "Mentor role granted" : "Role revoked"));
+    setUserRoleMsg(p => ({ ...p, [u.id]: msg }));
+    setAllUsers(prev => prev.map(r => r.id === u.id ? { ...r, role: grant ? "mentor" : "student" } : r));
+    setTimeout(() => setUserRoleMsg(p => ({ ...p, [u.id]: "" })), 4000);
+  }
 
   async function signOut() { await supabase.auth.signOut(); router.push("/login"); }
 
@@ -624,20 +830,24 @@ export default function DashboardPage() {
   });
   const visCats = CATS.filter(c => visible.some(g => g.cat === c.tag));
 
+  const communityIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
+
   const tabs = [
-    { id:"games"        as Tab, label:"Games",        icon:NAV.games },
-    { id:"mentorships"  as Tab, label:"Mentorships",  icon:NAV.mship },
-    { id:"leaderboard"  as Tab, label:"Leaderboard",  icon:NAV.lb    },
-    { id:"stats"        as Tab, label:"Statistics",   icon:NAV.stats },
-    ...(mentor ? [{ id:"admin" as Tab, label:"Admin", icon:NAV.admin }] : []),
+    { id:"games"        as Tab, label:"Games",                     icon:NAV.games     },
+    ...(myMembership ? [{ id:"community" as Tab, label:myMembership.name, icon:communityIcon }] : []),
+    { id:"mentorships"  as Tab, label:"Mentorships",               icon:NAV.mship     },
+    { id:"leaderboard"  as Tab, label:"Leaderboard",               icon:NAV.lb        },
+    { id:"stats"        as Tab, label:"Statistics",                icon:NAV.stats     },
+    ...(mentor ? [{ id:"admin" as Tab, label:"Admin",              icon:NAV.admin }] : []),
   ];
 
-  const PAGE: Record<Tab,{t:string;s:string}> = {
-    games:        { t:"Game Arcade",   s:`${ALL_GAMES.length} games available`   },
-    mentorships:  { t:"Mentorships",   s:"Browse and manage trading communities" },
-    leaderboard:  { t:"Leaderboard",   s:"Your personal best scores"             },
-    stats:        { t:"Statistics",    s:"Your performance overview"             },
-    admin:        { t:"Admin Panel",   s:"Mentor controls & user management"     },
+  const PAGE: Record<Tab,{t:string;s:string;icon:React.ReactElement}> = {
+    games:       { t:"Game Arcade",   s:`${ALL_GAMES.length} games available`,           icon:NAV.games     },
+    community:   { t:myMembership?.name ?? "My Community", s:"Your mentorship community",icon:communityIcon },
+    mentorships: { t:"Mentorships",   s:"Browse and manage trading communities",         icon:NAV.mship     },
+    leaderboard: { t:"Leaderboard",   s:"Your personal best scores",                     icon:NAV.lb        },
+    stats:       { t:"Statistics",    s:"Your performance overview",                     icon:NAV.stats     },
+    admin:       { t:"Admin Panel",   s:"Mentor controls & user management",             icon:NAV.admin     },
   };
 
   // global card index for stagger offset across all categories
@@ -659,12 +869,21 @@ export default function DashboardPage() {
           <nav className="sb-nav">
             <div className="sb-lbl">Menu</div>
             {tabs.map(t => (
-              <button key={t.id} className={`sb-btn${tab===t.id?" on":""}`} onClick={() => setTab(t.id)}>
-                <span style={{ opacity:.65 }}>{t.icon}</span>
+              <button key={t.id}
+                className={`sb-btn${tab===t.id?" on":""}`}
+                onClick={() => setTab(t.id)}
+                style={t.id==="community" && myMembership ? {
+                  "--sb-comm-accent": myMembership.accent_color,
+                } as React.CSSProperties : {}}
+              >
+                <span style={{ opacity: tab===t.id ? 1 : .6, color: t.id==="community" && myMembership ? myMembership.accent_color : undefined }}>
+                  {t.icon}
+                </span>
                 {t.label}
                 {t.id==="games"       && <span className="sb-badge">{ALL_GAMES.length}</span>}
                 {t.id==="leaderboard" && lbRows.length>0 && <span className="sb-badge">{lbRows.length}</span>}
                 {t.id==="admin"       && <span className="sb-mbadge">Mentor</span>}
+                {t.id==="community"   && <span style={{ marginLeft:"auto", width:7, height:7, borderRadius:"50%", background:myMembership?.accent_color ?? "#22d3ee", boxShadow:`0 0 6px ${myMembership?.accent_color ?? "#22d3ee"}` }} />}
               </button>
             ))}
           </nav>
@@ -681,16 +900,39 @@ export default function DashboardPage() {
         {/* ── main ── */}
         <div className="mn">
           <header className="tb">
-            <div>
-              <div className="tb-t">{PAGE[tab].t}</div>
-              <div className="tb-s">{PAGE[tab].s}</div>
-            </div>
-            {tab==="games" && (
-              <div className="tb-srch">
-                {NAV.search}
-                <input placeholder="Search games…" value={search} onChange={e => setSearch(e.target.value)} />
+            <div className="tb-left">
+              <div className="tb-icon" style={tab==="community" && myMembership ? { background:`${myMembership.accent_color}14`, borderColor:`${myMembership.accent_color}30`, color:myMembership.accent_color } : {}}>
+                {PAGE[tab].icon}
               </div>
-            )}
+              <div>
+                <div className="tb-t">{PAGE[tab].t}</div>
+                <div className="tb-s">{PAGE[tab].s}</div>
+              </div>
+            </div>
+            <div className="tb-right">
+              {tab==="games" && (
+                <div className="tb-srch">
+                  {NAV.search}
+                  <input placeholder="Search games…" value={search} onChange={e => setSearch(e.target.value)} />
+                </div>
+              )}
+              {mentor && (
+                <span className="tb-role tb-role-mentor">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  Mentor
+                </span>
+              )}
+              {!mentor && myMembership && (
+                <span className="tb-role tb-role-member" style={{ background:`${myMembership.accent_color}12`, borderColor:`${myMembership.accent_color}30`, color:myMembership.accent_color }}>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                  Member
+                </span>
+              )}
+              <div className="tb-user-chip">
+                <div className="tb-av">{initials}</div>
+                <span className="tb-uname">{name.split(" ")[0]}</span>
+              </div>
+            </div>
           </header>
 
           <div className="ct" ref={contentRef}>
@@ -803,6 +1045,102 @@ export default function DashboardPage() {
                 })}
               </div>
             )}
+
+            {/* ═══ MY COMMUNITY ════════════════════ */}
+            {tab==="community" && myMembership && (() => {
+              const ms = myMembership;
+              const ac = ms.accent_color;
+              const hexDimLocal = (hex: string, o: number) => { const h=hex.replace("#",""); const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16); return `rgba(${r},${g},${b},${o})`; };
+              return (
+                <div key="comm">
+                  {/* Hero */}
+                  <div className="cm-hero" style={{ background:`linear-gradient(135deg,${hexDimLocal(ac,.08)},rgba(129,140,248,.04))`, border:`1px solid ${hexDimLocal(ac,.22)}`, "--cm-accent":ac, "--cm-dim":hexDimLocal(ac,.05) } as React.CSSProperties}>
+                    <div className="cm-av" style={{ background: ms.logo ? "transparent" : ac, overflow:"hidden" }}>
+                      {ms.logo ? <img src={ms.logo} alt="logo" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : (ms.name||"?")[0].toUpperCase()}
+                    </div>
+                    <div className="cm-info">
+                      <div className="cm-name">{ms.name}</div>
+                      {ms.tagline && <div className="cm-tag">{ms.tagline}</div>}
+                      <div className="cm-meta">
+                        <span style={{ fontSize:11.5, color:"#71717a" }}>by {ms.mentor_name || "Mentor"}</span>
+                        {ms.category && ms.category !== "General" && (
+                          <span className="cm-pill" style={{ background:hexDimLocal(ac,.1), border:`1px solid ${hexDimLocal(ac,.25)}`, color:ac }}>{ms.category}</span>
+                        )}
+                        <span className="cm-pill" style={{ background:"rgba(255,255,255,.04)", border:"1px solid rgba(255,255,255,.08)", color:"#71717a" }}>{ms.active_game_ids?.length ?? 0} games</span>
+                        {ms.social_link && (
+                          <a href={ms.social_link} target="_blank" rel="noopener noreferrer"
+                            style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:11, fontWeight:700, color:ac, textDecoration:"none" }}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                            Community Link
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <div className="cm-status">
+                      <span className="cm-active"><span className="cm-active-dot" /> Active Member</span>
+                    </div>
+                  </div>
+
+                  {/* Featured Games */}
+                  {ms.active_game_ids?.length > 0 && (
+                    <>
+                      <div className="cm-section-lbl">Featured Games — {ms.active_game_ids.length} picked by your mentor</div>
+                      <div className="cm-games-grid">
+                        {ms.active_game_ids.map(gid => {
+                          const g = ALL_GAMES.find(x => x.id === gid);
+                          if (!g) return null;
+                          return (
+                            <div key={gid} className="cm-game-card"
+                              style={{ "--cg-accent":g.accent, "--cg-dim":`${g.accent}12`, "--cg-border":`${g.accent}28`, "--cg-hover":`${g.accent}20` } as React.CSSProperties}>
+                              <div className="cm-game-icon" style={{ background:`${g.accent}12`, border:`1px solid ${g.accent}28`, color:g.accent }}>
+                                <div style={{ width:20, height:20 }}>{GAME_ICONS[g.id]}</div>
+                              </div>
+                              <div>
+                                <div className="cm-game-name">{g.name}</div>
+                                <div className="cm-game-cat">{g.cat}</div>
+                              </div>
+                              <Link href={`/sample-mentor/${g.path}`} className="cm-play-btn">
+                                {NAV.play} Play
+                              </Link>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Rules */}
+                  {ms.rules?.filter((r: string) => r.trim()).length > 0 && (
+                    <>
+                      <div className="cm-section-lbl">Community Rules</div>
+                      <div className="cm-rules">
+                        {ms.rules.filter((r: string) => r.trim()).map((rule: string, i: number) => (
+                          <div key={i} className="cm-rule">
+                            <span className="cm-rule-n">{i+1}</span>
+                            <span className="cm-rule-t">{rule}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {/* My member card */}
+                  <div className="cm-section-lbl">Your Membership</div>
+                  <div className="cm-member-card" style={{ border:`1px solid ${hexDimLocal(ac,.2)}` }}>
+                    <div className="cm-member-av" style={{ background:hexDimLocal(ac,.15), color:ac }}>
+                      {initials}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:"#fafafa", marginBottom:3 }}>{name}</div>
+                      <div style={{ fontSize:11.5, color:"#71717a" }}>{user.email}</div>
+                    </div>
+                    <span className="cm-pill" style={{ background:"rgba(34,197,94,.09)", border:"1px solid rgba(34,197,94,.22)", color:"#22c55e", fontSize:10, fontWeight:800 }}>
+                      ✓ Accepted
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* ═══ MENTORSHIPS ═════════════════════ */}
             {tab==="mentorships" && (
@@ -977,32 +1315,141 @@ export default function DashboardPage() {
                   ))}
                 </div>
 
-                {/* role management */}
-                <div style={{ fontSize:9.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".1em", color:"#27272a", marginBottom:10 }}>Role Management via Supabase SQL</div>
-                <div style={{ background:"#111113", border:"1px solid rgba(255,255,255,.07)", borderRadius:12, overflow:"hidden", marginBottom:18 }}>
-                  <div style={{ padding:"12px 18px", borderBottom:"1px solid rgba(255,255,255,.06)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                    <span style={{ fontSize:12, fontWeight:700, color:"#a1a1aa" }}>Grant Mentor Role</span>
-                    <span style={{ fontSize:10, color:"#3f3f46" }}>Run in Supabase SQL Editor</span>
+                {/* all users */}
+                <div style={{ fontSize:9.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".1em", color:"#52525b", marginBottom:12 }}>All Users</div>
+                <div className="users-panel">
+                  <div className="users-head">
+                    <div className="users-search-wrap">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#52525b" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                      <input
+                        className="users-search"
+                        placeholder="Search by name or email…"
+                        value={userSearch}
+                        onChange={e => setUserSearch(e.target.value)}
+                      />
+                    </div>
+                    <button
+                      className="users-reload"
+                      onClick={loadAllUsers}
+                      disabled={usersLoading}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={usersLoading ? { animation:"spin .8s linear infinite" } : {}}><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+                      {usersLoading ? "Loading…" : allUsers.length > 0 ? `${allUsers.length} users` : "Load Users"}
+                    </button>
                   </div>
-                  <pre style={{ margin:0, padding:"14px 18px", fontSize:11.5, fontFamily:"var(--font-geist-mono,'Courier New',monospace)", color:"#22d3ee", lineHeight:1.7, overflowX:"auto", background:"rgba(34,211,238,.03)" }}>
-{`UPDATE auth.users
-SET raw_user_meta_data = jsonb_set(
-  COALESCE(raw_user_meta_data, '{}'::jsonb),
-  '{role}', '"mentor"'
-)
-WHERE email = 'student@example.com';`}
-                  </pre>
+                  {allUsers.length === 0 && !usersLoading && (
+                    <div className="users-empty">
+                      Click <strong style={{ color:"#a1a1aa" }}>Load Users</strong> to fetch all registered accounts.
+                    </div>
+                  )}
+                  {usersLoading && (
+                    <div className="users-empty">
+                      <div className="spin" style={{ width:20, height:20, margin:"0 auto 8px", borderRadius:"50%", border:"2px solid rgba(34,211,238,.15)", borderTop:"2px solid #22d3ee", animation:"spin .8s linear infinite" }} />
+                      Fetching users…
+                    </div>
+                  )}
+                  {allUsers.length > 0 && !usersLoading && (() => {
+                    const q = userSearch.toLowerCase();
+                    const filtered = q
+                      ? allUsers.filter(u => u.email.toLowerCase().includes(q) || u.display_name.toLowerCase().includes(q))
+                      : allUsers;
+                    return (
+                      <table className="users-tbl">
+                        <thead><tr>
+                          <th>User</th>
+                          <th>Role</th>
+                          <th>Joined</th>
+                          <th>Actions</th>
+                        </tr></thead>
+                        <tbody>
+                          {filtered.map(u => {
+                            const initials = (u.display_name || u.email)[0].toUpperCase();
+                            const isMentorUser = u.role === "mentor";
+                            const loading = userRoleLoad[u.id];
+                            const msg = userRoleMsg[u.id] ?? "";
+                            return (
+                              <tr key={u.id}>
+                                <td>
+                                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                                    <div className="u-av" style={isMentorUser ? { background:"rgba(217,70,239,.1)", border:"1px solid rgba(217,70,239,.25)", color:"#d946ef" } : {}}>
+                                      {initials}
+                                    </div>
+                                    <div>
+                                      <div className="u-name">{u.display_name || u.email.split("@")[0]}</div>
+                                      <div className="u-email">{u.email}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td>
+                                  <span className={`u-badge ${isMentorUser ? "u-badge-mentor" : "u-badge-student"}`}>
+                                    {isMentorUser ? "Mentor" : "Student"}
+                                  </span>
+                                </td>
+                                <td style={{ fontSize:11, color:"#52525b", whiteSpace:"nowrap" }}>
+                                  {new Date(u.created_at).toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric" })}
+                                </td>
+                                <td>
+                                  <div className="u-acts">
+                                    {msg ? (
+                                      <span className={msg.startsWith("Error") ? "u-msg-err" : "u-msg-ok"}>{msg}</span>
+                                    ) : isMentorUser ? (
+                                      <button className="u-btn-revoke" onClick={() => handleUserRole(u, false)} disabled={!!loading}>
+                                        {loading ? "…" : "Revoke Mentor"}
+                                      </button>
+                                    ) : (
+                                      <button className="u-btn-grant" onClick={() => handleUserRole(u, true)} disabled={!!loading}>
+                                        {loading ? "…" : "Make Mentor"}
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    );
+                  })()}
                 </div>
-                <div style={{ background:"#111113", border:"1px solid rgba(255,255,255,.07)", borderRadius:12, overflow:"hidden" }}>
-                  <div style={{ padding:"12px 18px", borderBottom:"1px solid rgba(255,255,255,.06)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                    <span style={{ fontSize:12, fontWeight:700, color:"#a1a1aa" }}>Revoke Mentor Role</span>
-                    <span style={{ fontSize:10, color:"#3f3f46" }}>Run in Supabase SQL Editor</span>
+
+                {/* role management */}
+                <div style={{ fontSize:9.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".1em", color:"#52525b", marginBottom:12 }}>Role Management</div>
+                <div className="role-form-wrap">
+                  <div style={{ fontSize:13, fontWeight:700, color:"#fafafa", marginBottom:4 }}>Grant or Revoke Mentor Role</div>
+                  <div style={{ fontSize:12, color:"#71717a", marginBottom:16 }}>Enter the user's email address to instantly update their role.</div>
+                  <div className="role-form-row">
+                    <input
+                      className="role-input"
+                      type="email"
+                      placeholder="user@example.com"
+                      value={adminEmail}
+                      onChange={e => setAdminEmail(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && handleSetRole(adminEmail, true)}
+                    />
+                    <button
+                      className="role-btn-grant"
+                      onClick={() => handleSetRole(adminEmail, true)}
+                      disabled={roleLoading}
+                    >
+                      {roleLoading ? "…" : "Grant Mentor"}
+                    </button>
+                    <button
+                      className="role-btn-revoke"
+                      onClick={() => handleSetRole(adminEmail, false)}
+                      disabled={roleLoading}
+                    >
+                      {roleLoading ? "…" : "Revoke Role"}
+                    </button>
                   </div>
-                  <pre style={{ margin:0, padding:"14px 18px", fontSize:11.5, fontFamily:"var(--font-geist-mono,'Courier New',monospace)", color:"#f43f5e", lineHeight:1.7, overflowX:"auto", background:"rgba(244,63,94,.02)" }}>
-{`UPDATE auth.users
-SET raw_user_meta_data = raw_user_meta_data - 'role'
-WHERE email = 'student@example.com';`}
-                  </pre>
+                  {roleMsg && (
+                    <div className={roleMsg.startsWith("Error") ? "role-msg-err" : "role-msg-ok"}>
+                      {roleMsg.startsWith("Error")
+                        ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                        : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                      }
+                      {roleMsg}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

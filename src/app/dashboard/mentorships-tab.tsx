@@ -416,7 +416,13 @@ export default function MentorshipsTab({ user, isMentor, displayName }: Props) {
   const [reqLoading,      setReqLoading]      = useState(false);
   const [saving,          setSaving]          = useState(false);
   const [saveMsg,         setSaveMsg]         = useState("");
-  const [copied,          setCopied]          = useState<string | null>(null);
+  const [showJoinForm,    setShowJoinForm]     = useState<string | null>(null); // mentorship id
+  const [joinDiscord,     setJoinDiscord]     = useState("");
+  const [joinMessage,     setJoinMessage]     = useState("");
+  const [joinAlready,     setJoinAlready]     = useState(false);
+  const [joinLoading,     setJoinLoading]     = useState(false);
+  const [joinMsg,         setJoinMsg]         = useState("");
+  const [myJoinRequests,  setMyJoinRequests]  = useState<{ mentorship_id: string; status: string }[]>([]);
   const [form, setForm] = useState<FormState>({ ...BLANK_FORM });
 
   const loadData = useCallback(async () => {
@@ -472,6 +478,12 @@ export default function MentorshipsTab({ user, isMentor, displayName }: Props) {
         .limit(1)
         .maybeSingle();
       setMyRequest(myReq ?? null);
+
+      const { data: myJoins } = await supabase
+        .from("mentorship_join_requests")
+        .select("mentorship_id, status")
+        .eq("email", user.email ?? "");
+      setMyJoinRequests(myJoins ?? []);
     }
 
     setLoading(false);
@@ -571,8 +583,33 @@ export default function MentorshipsTab({ user, isMentor, displayName }: Props) {
     setReqLoading(false);
   }
 
+  // ── student: join a community ─────────────────────────────────────────────
+  async function handleJoinCommunity(mentorshipId: string) {
+    setJoinLoading(true); setJoinMsg("");
+    const { error } = await supabase.from("mentorship_join_requests").insert({
+      mentorship_id:    mentorshipId,
+      full_name:        displayName,
+      email:            user.email ?? "",
+      discord_username: joinDiscord.trim(),
+      message:          joinMessage.trim() + (joinAlready ? " [Already a member of this community]" : ""),
+      status:           "pending",
+    });
+    setJoinLoading(false);
+    if (error) { setJoinMsg("err:" + error.message); return; }
+    setJoinMsg("ok:Request sent! The mentor will review it shortly.");
+    setJoinDiscord(""); setJoinMessage(""); setJoinAlready(false);
+    setTimeout(() => { setJoinMsg(""); setShowJoinForm(null); }, 3500);
+    await loadData();
+  }
+
   // ── approve / reject mentor role request ─────────────────────────────────
   async function handleRequestAction(id: string, status: "approved" | "rejected") {
+    if (status === "approved") {
+      const req = pendingReqs.find(r => r.id === id);
+      if (req?.email) {
+        await supabase.rpc("set_user_mentor_role", { target_email: req.email, grant_role: true });
+      }
+    }
     await supabase.from("mentor_requests").update({ status }).eq("id", id);
     await loadData();
   }
@@ -581,15 +618,6 @@ export default function MentorshipsTab({ user, isMentor, displayName }: Props) {
   async function handleJoinAction(id: string, status: "accepted" | "rejected") {
     await supabase.from("mentorship_join_requests").update({ status }).eq("id", id);
     setJoinReqs(prev => prev.map(r => r.id === id ? { ...r, status } : r));
-  }
-
-  // ── copy SQL helper ───────────────────────────────────────────────────────
-  function copyGrantSQL(email: string, reqId: string) {
-    const sql = `UPDATE auth.users SET raw_user_meta_data = jsonb_set(COALESCE(raw_user_meta_data,'{}'),'{role}','"mentor"') WHERE email = '${email}';`;
-    navigator.clipboard.writeText(sql).then(() => {
-      setCopied(reqId);
-      setTimeout(() => setCopied(null), 2500);
-    });
   }
 
   // ── render ────────────────────────────────────────────────────────────────
@@ -634,18 +662,6 @@ export default function MentorshipsTab({ user, isMentor, displayName }: Props) {
                       <td style={{ fontSize:11, whiteSpace:"nowrap" }}>{fmtDate(req.created_at)}</td>
                       <td>
                         <div className="ms-req-acts">
-                          <button
-                            className="ms-sql-btn"
-                            onClick={() => copyGrantSQL(req.email, req.id)}
-                          >
-                            {copied === req.id
-                              ? <span className="ms-copied">Copied!</span>
-                              : <>
-                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-                                  Copy SQL
-                                </>
-                            }
-                          </button>
                           <button
                             className="ms-act ms-act-ok"
                             onClick={() => handleRequestAction(req.id, "approved")}
@@ -1133,6 +1149,76 @@ export default function MentorshipsTab({ user, isMentor, displayName }: Props) {
                   </div>
                 </>
               )}
+
+              {/* ── Student: join community ── */}
+              {!isMentor && (() => {
+                const existingReq = myJoinRequests.find(r => r.mentorship_id === selected.id);
+                if (existingReq) {
+                  return (
+                    <div style={{ marginTop:20, padding:"12px 16px", borderRadius:10, background: existingReq.status === "accepted" ? "rgba(34,197,94,.07)" : "rgba(255,255,255,.04)", border:`1px solid ${existingReq.status === "accepted" ? "rgba(34,197,94,.2)" : "rgba(255,255,255,.08)"}`, display:"flex", alignItems:"center", gap:10 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={existingReq.status === "accepted" ? "#22c55e" : "#a1a1aa"} strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                      <span style={{ fontSize:12.5, color: existingReq.status === "accepted" ? "#22c55e" : "#a1a1aa", fontWeight:600 }}>
+                        {existingReq.status === "accepted" ? "You're a member of this community" : existingReq.status === "pending" ? "Join request pending review" : "Your request was declined"}
+                      </span>
+                    </div>
+                  );
+                }
+                return showJoinForm === selected.id ? (
+                  <div style={{ marginTop:20, background:"#111113", border:"1px solid rgba(255,255,255,.09)", borderRadius:14, padding:"20px 20px 16px" }}>
+                    <div style={{ fontSize:13.5, fontWeight:800, color:"#fafafa", marginBottom:4 }}>Request to Join</div>
+                    <div style={{ fontSize:11.5, color:"#71717a", marginBottom:16 }}>Your name and email will be shared with the mentor.</div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+                      <div>
+                        <div style={{ fontSize:9.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".08em", color:"#52525b", marginBottom:6 }}>Full Name</div>
+                        <input className="ms-input" value={displayName} readOnly style={{ background:"rgba(255,255,255,.03)", color:"#71717a" }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize:9.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".08em", color:"#52525b", marginBottom:6 }}>Email</div>
+                        <input className="ms-input" value={user.email ?? ""} readOnly style={{ background:"rgba(255,255,255,.03)", color:"#71717a" }} />
+                      </div>
+                    </div>
+                    <div style={{ marginBottom:10 }}>
+                      <div style={{ fontSize:9.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".08em", color:"#52525b", marginBottom:6 }}>Discord Username</div>
+                      <input className="ms-input" placeholder="@yourname" value={joinDiscord} onChange={e => setJoinDiscord(e.target.value)} maxLength={60} />
+                    </div>
+                    <div style={{ marginBottom:12 }}>
+                      <div style={{ fontSize:9.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".08em", color:"#52525b", marginBottom:6 }}>Message (optional)</div>
+                      <textarea className="ms-input ms-textarea" placeholder="Why do you want to join?" value={joinMessage} onChange={e => setJoinMessage(e.target.value)} maxLength={300} style={{ width:"100%", minHeight:64 }} />
+                    </div>
+                    <label style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14, cursor:"pointer", userSelect:"none" }}>
+                      <input type="checkbox" checked={joinAlready} onChange={e => setJoinAlready(e.target.checked)} style={{ accentColor: selected.accent_color, width:14, height:14 }} />
+                      <span style={{ fontSize:12, color:"#a1a1aa" }}>I am already a member of this community</span>
+                    </label>
+                    {joinMsg && (
+                      <div style={{ padding:"8px 12px", borderRadius:8, background: joinMsg.startsWith("err:") ? "rgba(244,63,94,.08)" : "rgba(34,197,94,.08)", border:`1px solid ${joinMsg.startsWith("err:") ? "rgba(244,63,94,.2)" : "rgba(34,197,94,.2)"}`, color: joinMsg.startsWith("err:") ? "#f43f5e" : "#22c55e", fontSize:12, marginBottom:12 }}>
+                        {joinMsg.replace(/^(err:|ok:)/, "")}
+                      </div>
+                    )}
+                    <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
+                      <button className="ms-btn ms-btn-ghost ms-btn-sm" onClick={() => { setShowJoinForm(null); setJoinDiscord(""); setJoinMessage(""); setJoinAlready(false); setJoinMsg(""); }}>Cancel</button>
+                      <button
+                        className="ms-btn ms-btn-primary ms-btn-sm"
+                        style={{ background: hexDim(selected.accent_color, 0.12), borderColor: hexDim(selected.accent_color, 0.35), color: selected.accent_color }}
+                        onClick={() => handleJoinCommunity(selected.id)}
+                        disabled={joinLoading}
+                      >
+                        {joinLoading ? <><div className="ms-spin" style={{ width:12, height:12, borderTopColor: selected.accent_color }} /> Sending…</> : "Send Request"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ marginTop:20, display:"flex", justifyContent:"flex-end" }}>
+                    <button
+                      className="ms-btn ms-btn-primary"
+                      style={{ background: hexDim(selected.accent_color, 0.1), borderColor: hexDim(selected.accent_color, 0.3), color: selected.accent_color }}
+                      onClick={() => setShowJoinForm(selected.id)}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
+                      Join Community
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           </>
         )}
