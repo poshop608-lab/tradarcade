@@ -677,11 +677,14 @@ const CSS = `
 `;
 
 // ── scroll reveal hook ─────────────────────────────────────────────────────────
-function useScrollReveal(containerRef: React.RefObject<HTMLDivElement | null>) {
+// dep changes whenever tab switches or loading completes, so cards are
+// re-observed after they mount (cards start at opacity:0 and need .show)
+function useScrollReveal(containerRef: React.RefObject<HTMLDivElement | null>, dep: string) {
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const cards = el.querySelectorAll<HTMLElement>(".gc");
+    if (cards.length === 0) return;
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -698,7 +701,7 @@ function useScrollReveal(containerRef: React.RefObject<HTMLDivElement | null>) {
     );
     cards.forEach((c) => observer.observe(c));
     return () => observer.disconnect();
-  }, []); // run once on mount
+  }, [dep]);
 }
 
 // ── component ─────────────────────────────────────────────────────────────────
@@ -724,8 +727,11 @@ export default function DashboardPage() {
   const [userSearch,     setUserSearch]    = useState("");
   const [userRoleMsg,    setUserRoleMsg]   = useState<Record<string, string>>({});
   const [userRoleLoad,   setUserRoleLoad]  = useState<Record<string, boolean>>({});
+  const [lbMode,         setLbMode]        = useState<"personal"|"community">("personal");
+  const [communityLb,    setCommunityLb]   = useState<{game_id:string;game_name:string;score:number;user_id:string}[]>([]);
+  const [communityTotal, setCommunityTotal]= useState<number>(0);
 
-  useScrollReveal(contentRef);
+  useScrollReveal(contentRef, `${tab}${loading}`);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -763,6 +769,26 @@ export default function DashboardPage() {
           const { data: ms } = await supabase.from("mentorships").select("*").eq("id", data.mentorship_id).single();
           if (ms) setMyMembership(ms as MembershipInfo);
         }
+      });
+  }, [user]);
+
+  // Fetch community leaderboard from Supabase game_sessions table
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("game_sessions")
+      .select("game_id, game_name, score, user_id")
+      .not("score", "is", null)
+      .order("score", { ascending: false })
+      .limit(100)
+      .then(({ data }) => {
+        if (data && data.length > 0) setCommunityLb(data as {game_id:string;game_name:string;score:number;user_id:string}[]);
+      });
+    supabase
+      .from("game_sessions")
+      .select("id", { count: "exact", head: true })
+      .then(({ count }) => {
+        if (count != null) setCommunityTotal(count);
       });
   }, [user]);
 
@@ -823,7 +849,10 @@ export default function DashboardPage() {
     .map(g => ({ ...g, count:(byGame[g.id]||[]).length, best:bestScores[g.id]??null, accuracy:avgAcc[g.id]??null, lastPlayed:byGame[g.id]?.[byGame[g.id].length-1]?.timestamp??null }))
     .filter(r => r.count > 0).sort((a,b) => (b.best??0)-(a.best??0));
 
+  // Filter games by mentorship assignment when user has an active membership
+  const membershipGameIds = myMembership?.active_game_ids;
   const visible = ALL_GAMES.filter(g => {
+    if (membershipGameIds?.length && !membershipGameIds.includes(g.id)) return false;
     const mf = filter === "all" || g.cat.toLowerCase() === filter;
     const ms = !search || g.name.toLowerCase().includes(search.toLowerCase()) || g.desc.toLowerCase().includes(search.toLowerCase());
     return mf && ms;
@@ -842,10 +871,10 @@ export default function DashboardPage() {
   ];
 
   const PAGE: Record<Tab,{t:string;s:string;icon:React.ReactElement}> = {
-    games:       { t:"Game Arcade",   s:`${ALL_GAMES.length} games available`,           icon:NAV.games     },
+    games:       { t:"Game Arcade",   s: membershipGameIds?.length ? `${visible.length} games from your mentorship` : `${ALL_GAMES.length} games available`, icon:NAV.games },
     community:   { t:myMembership?.name ?? "My Community", s:"Your mentorship community",icon:communityIcon },
     mentorships: { t:"Mentorships",   s:"Browse and manage trading communities",         icon:NAV.mship     },
-    leaderboard: { t:"Leaderboard",   s:"Your personal best scores",                     icon:NAV.lb        },
+    leaderboard: { t:"Leaderboard",   s: lbMode === "community" ? `${communityTotal} community sessions` : "Your personal best scores", icon:NAV.lb },
     stats:       { t:"Statistics",    s:"Your performance overview",                     icon:NAV.stats     },
     admin:       { t:"Admin Panel",   s:"Mentor controls & user management",             icon:NAV.admin     },
   };
@@ -1155,39 +1184,115 @@ export default function DashboardPage() {
             {/* ═══ LEADERBOARD ═════════════════════ */}
             {tab==="leaderboard" && (
               <div key="lb">
-                {lbRows.length===0 ? (
-                  <div className="empty">
-                    <div className="empty-ico">{NAV.lb}</div>
-                    <div className="empty-t">No scores yet</div>
-                    <p className="empty-s">Play games to start ranking your personal bests.</p>
-                    <button className="empty-btn" onClick={() => setTab("games")}>Browse Games</button>
-                  </div>
-                ) : (
-                  <table className="lbt">
-                    <thead><tr><th>Rank</th><th>Game</th><th>Best Score</th><th>Accuracy</th><th>Sessions</th><th>Last Played</th></tr></thead>
-                    <tbody>
-                      {lbRows.map((r,i) => (
-                        <tr key={r.id}>
-                          <td><span className={`lbt-r lbt-r${i<3?i+1:"n"}`}>{i===0?"1st":i===1?"2nd":i===2?"3rd":`#${i+1}`}</span></td>
-                          <td>
-                            <div style={{ display:"flex", alignItems:"center", gap:11 }}>
-                              <div style={{ width:34, height:34, borderRadius:9, background:`${r.accent}14`, border:`1px solid ${r.accent}33`, display:"flex", alignItems:"center", justifyContent:"center", color:r.accent, flexShrink:0 }}>
-                                <div style={{ width:20, height:20 }}>{GAME_ICONS[r.id]}</div>
+                {/* Mode toggle */}
+                <div style={{ display:"flex", gap:6, marginBottom:20 }}>
+                  {(["personal","community"] as const).map(m => (
+                    <button key={m} onClick={() => setLbMode(m)} style={{
+                      padding:"6px 16px", borderRadius:20, fontFamily:"inherit", fontSize:11, fontWeight:700,
+                      border:"1px solid", cursor:"pointer", transition:"all .15s",
+                      ...(lbMode===m
+                        ? { background:"rgba(34,211,238,.1)", borderColor:"rgba(34,211,238,.3)", color:"#22d3ee" }
+                        : { background:"transparent", borderColor:"rgba(255,255,255,.08)", color:"#52525b" }),
+                    }}>
+                      {m === "personal" ? "My Scores" : `Community${communityLb.length > 0 ? ` (${communityLb.length})` : ""}`}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Personal leaderboard */}
+                {lbMode==="personal" && (
+                  lbRows.length===0 ? (
+                    <div className="empty">
+                      <div className="empty-ico">{NAV.lb}</div>
+                      <div className="empty-t">No scores yet</div>
+                      <p className="empty-s">Play games to start ranking your personal bests.</p>
+                      <button className="empty-btn" onClick={() => setTab("games")}>Browse Games</button>
+                    </div>
+                  ) : (
+                    <table className="lbt">
+                      <thead><tr><th>Rank</th><th>Game</th><th>Best Score</th><th>Accuracy</th><th>Sessions</th><th>Last Played</th></tr></thead>
+                      <tbody>
+                        {lbRows.map((r,i) => (
+                          <tr key={r.id}>
+                            <td><span className={`lbt-r lbt-r${i<3?i+1:"n"}`}>{i===0?"1st":i===1?"2nd":i===2?"3rd":`#${i+1}`}</span></td>
+                            <td>
+                              <div style={{ display:"flex", alignItems:"center", gap:11 }}>
+                                <div style={{ width:34, height:34, borderRadius:9, background:`${r.accent}14`, border:`1px solid ${r.accent}33`, display:"flex", alignItems:"center", justifyContent:"center", color:r.accent, flexShrink:0 }}>
+                                  <div style={{ width:20, height:20 }}>{GAME_ICONS[r.id]}</div>
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight:700, color:"#fafafa", fontSize:13 }}>{r.name}</div>
+                                  <div style={{ fontSize:10, color:"#71717a" }}>{r.cat}</div>
+                                </div>
                               </div>
-                              <div>
-                                <div style={{ fontWeight:700, color:"#fafafa", fontSize:13 }}>{r.name}</div>
-                                <div style={{ fontSize:10, color:"#71717a" }}>{r.cat}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td style={{ fontSize:17, fontWeight:900, color:"#22d3ee", letterSpacing:"-.02em" }}>{r.best??"-"}</td>
-                          <td>{r.accuracy!=null?<span style={{ color:"#22c55e", fontWeight:700 }}>{Math.round(r.accuracy*100)}%</span>:<span style={{ color:"#27272a" }}>-</span>}</td>
-                          <td>{r.count}</td>
-                          <td style={{ fontSize:11 }}>{r.lastPlayed?fmtDate(r.lastPlayed):"-"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            </td>
+                            <td style={{ fontSize:17, fontWeight:900, color:"#22d3ee", letterSpacing:"-.02em" }}>{r.best??"-"}</td>
+                            <td>{r.accuracy!=null?<span style={{ color:"#22c55e", fontWeight:700 }}>{Math.round(r.accuracy*100)}%</span>:<span style={{ color:"#27272a" }}>-</span>}</td>
+                            <td>{r.count}</td>
+                            <td style={{ fontSize:11 }}>{r.lastPlayed?fmtDate(r.lastPlayed):"-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )
+                )}
+
+                {/* Community leaderboard */}
+                {lbMode==="community" && (
+                  communityLb.length===0 ? (
+                    <div className="empty">
+                      <div className="empty-ico">{NAV.lb}</div>
+                      <div className="empty-t">No community scores yet</div>
+                      <p className="empty-s">
+                        Community data is stored in Supabase. Make sure the{" "}
+                        <code style={{ fontSize:11, background:"rgba(255,255,255,.06)", padding:"1px 6px", borderRadius:4 }}>game_sessions</code>{" "}
+                        table has been created and game sessions are being recorded to the database.
+                      </p>
+                    </div>
+                  ) : (() => {
+                    // Group by game, find top score per game
+                    const gameMap = new Map<string, {game_id:string;game_name:string;topScore:number;plays:number}>();
+                    communityLb.forEach(r => {
+                      const existing = gameMap.get(r.game_id);
+                      if (!existing) {
+                        gameMap.set(r.game_id, { game_id:r.game_id, game_name:r.game_name, topScore:r.score, plays:1 });
+                      } else {
+                        existing.plays++;
+                        if (r.score > existing.topScore) existing.topScore = r.score;
+                      }
+                    });
+                    const rows = [...gameMap.values()].sort((a,b) => b.topScore - a.topScore);
+                    return (
+                      <table className="lbt">
+                        <thead><tr><th>Rank</th><th>Game</th><th>Top Score (Community)</th><th>Total Plays</th></tr></thead>
+                        <tbody>
+                          {rows.map((r,i) => {
+                            const g = ALL_GAMES.find(x => x.id === r.game_id);
+                            return (
+                              <tr key={r.game_id}>
+                                <td><span className={`lbt-r lbt-r${i<3?i+1:"n"}`}>{i===0?"1st":i===1?"2nd":i===2?"3rd":`#${i+1}`}</span></td>
+                                <td>
+                                  <div style={{ display:"flex", alignItems:"center", gap:11 }}>
+                                    {g && (
+                                      <div style={{ width:34, height:34, borderRadius:9, background:`${g.accent}14`, border:`1px solid ${g.accent}33`, display:"flex", alignItems:"center", justifyContent:"center", color:g.accent, flexShrink:0 }}>
+                                        <div style={{ width:20, height:20 }}>{GAME_ICONS[g.id]}</div>
+                                      </div>
+                                    )}
+                                    <div>
+                                      <div style={{ fontWeight:700, color:"#fafafa", fontSize:13 }}>{r.game_name || g?.name || r.game_id}</div>
+                                      {g && <div style={{ fontSize:10, color:"#71717a" }}>{g.cat}</div>}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td style={{ fontSize:17, fontWeight:900, color:"#22d3ee", letterSpacing:"-.02em" }}>{r.topScore}</td>
+                                <td style={{ color:"#71717a", fontSize:13 }}>{r.plays} plays</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    );
+                  })()
                 )}
               </div>
             )}
@@ -1195,6 +1300,27 @@ export default function DashboardPage() {
             {/* ═══ STATS ═══════════════════════════ */}
             {tab==="stats" && (
               <div key="st">
+                {/* Community stats banner (from Supabase) */}
+                {communityTotal > 0 && (
+                  <div style={{ background:"linear-gradient(135deg,rgba(34,211,238,.07),rgba(217,70,239,.05))", border:"1px solid rgba(34,211,238,.18)", borderRadius:14, padding:"14px 20px", marginBottom:20, display:"flex", alignItems:"center", justifyContent:"space-between", gap:20 }}>
+                    <div>
+                      <div style={{ fontSize:9.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".1em", color:"#22d3ee", marginBottom:4 }}>Community Stats</div>
+                      <div style={{ fontSize:13, color:"#a1a1aa" }}>
+                        <strong style={{ color:"#fafafa", fontSize:17 }}>{communityTotal.toLocaleString()}</strong> total sessions played across the whole platform
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", gap:20, flexShrink:0 }}>
+                      <div style={{ textAlign:"center" }}>
+                        <div style={{ fontSize:20, fontWeight:900, color:"#22d3ee" }}>{new Set(communityLb.map(r=>r.user_id)).size}</div>
+                        <div style={{ fontSize:9.5, color:"#71717a", textTransform:"uppercase", letterSpacing:".06em" }}>Players</div>
+                      </div>
+                      <div style={{ textAlign:"center" }}>
+                        <div style={{ fontSize:20, fontWeight:900, color:"#d946ef" }}>{new Set(communityLb.map(r=>r.game_id)).size}</div>
+                        <div style={{ fontSize:9.5, color:"#71717a", textTransform:"uppercase", letterSpacing:".06em" }}>Games</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="scg">
                   {[
                     { lbl:"Sessions",     ico:NAV.games, acc:"c", val:sessions.length,   color:"#22d3ee", sub:`${Object.keys(byGame).length} games tried`,   ibg:"rgba(34,211,238,.08)"  },
@@ -1261,10 +1387,10 @@ export default function DashboardPage() {
                 {/* stat strip */}
                 <div className="admin-strip">
                   {[
-                    { val:ALL_GAMES.length,            lbl:"Total Games",    color:"#22d3ee" },
-                    { val:Object.keys(byGame).length,  lbl:"Games Played",   color:"#22c55e" },
-                    { val:sessions.length,             lbl:"Your Sessions",  color:"#f59e0b" },
-                    { val:banned.size,                 lbl:"Banned Users",   color:"#f43f5e" },
+                    { val:ALL_GAMES.length,                                  lbl:"Total Games",         color:"#22d3ee" },
+                    { val:communityTotal > 0 ? communityTotal : sessions.length, lbl: communityTotal > 0 ? "Community Sessions" : "Your Sessions", color:"#f59e0b" },
+                    { val:new Set(communityLb.map(r=>r.user_id)).size || allUsers.length, lbl:"Players", color:"#22c55e" },
+                    { val:banned.size,                                        lbl:"Banned Users",        color:"#f43f5e" },
                   ].map(s => (
                     <div key={s.lbl} className="asc" style={{ borderTop:`2px solid ${s.color}` }}>
                       <div className="asc-val" style={{ color:s.color }}>{s.val}</div>
@@ -1290,33 +1416,44 @@ export default function DashboardPage() {
                 {/* quick actions */}
                 <div style={{ fontSize:9.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".1em", color:"#27272a", marginBottom:10 }}>Quick Actions</div>
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(240px, 1fr))", gap:12, marginBottom:22 }}>
-                  {[
-                    { label:"Configure Games",   sub:"Edit game content & toggle games on/off",  href:"/mentor",     icon:NAV.games,  accent:"#22d3ee" },
-                    { label:"View All Players",  sub:"Browse student scores across all games",    href:"/stats",      icon:NAV.stats,  accent:"#22c55e" },
-                    { label:"Preview Hub",       sub:"See the student-facing arcade hub",         href:"/sample-mentor", icon:NAV.lb, accent:"#f59e0b" },
-                  ].map(a => (
-                    <Link key={a.label} href={a.href} style={{
+                  {([
+                    { label:"Configure Games",   sub:"Edit game content & toggle games on/off",  href:"/mentor",        isLink:true,  icon:NAV.games,  accent:"#22d3ee" },
+                    { label:"View All Players",  sub:"Browse all registered players below",       href:"#all-users",     isLink:false, icon:NAV.stats,  accent:"#22c55e" },
+                    { label:"Preview Hub",       sub:"See the student-facing arcade hub",         href:"/sample-mentor", isLink:true,  icon:NAV.lb,     accent:"#f59e0b" },
+                  ] as const).map(a => {
+                    const cardStyle: React.CSSProperties = {
                       display:"flex", alignItems:"center", gap:14, padding:"16px 18px",
                       background:"#111113", border:`1px solid rgba(255,255,255,.07)`,
                       borderRadius:12, textDecoration:"none", transition:"border-color .15s, background .15s",
-                    }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `${a.accent}44`; (e.currentTarget as HTMLElement).style.background = `${a.accent}07`; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,.07)"; (e.currentTarget as HTMLElement).style.background = "#111113"; }}
-                    >
-                      <div style={{ width:36, height:36, borderRadius:10, background:`${a.accent}14`, border:`1px solid ${a.accent}30`, display:"flex", alignItems:"center", justifyContent:"center", color:a.accent, flexShrink:0 }}>
-                        {a.icon}
-                      </div>
-                      <div style={{ minWidth:0 }}>
-                        <div style={{ fontSize:13, fontWeight:700, color:"#fafafa", marginBottom:2 }}>{a.label}</div>
-                        <div style={{ fontSize:11, color:"#71717a" }}>{a.sub}</div>
-                      </div>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3f3f46" strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink:0, marginLeft:"auto" }}><path d="M9 18l6-6-6-6"/></svg>
-                    </Link>
-                  ))}
+                      cursor:"pointer", width:"100%", textAlign:"left",
+                    };
+                    const onEnter = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.borderColor = `${a.accent}44`; e.currentTarget.style.background = `${a.accent}07`; };
+                    const onLeave = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.borderColor = "rgba(255,255,255,.07)"; e.currentTarget.style.background = "#111113"; };
+                    const inner = (
+                      <>
+                        <div style={{ width:36, height:36, borderRadius:10, background:`${a.accent}14`, border:`1px solid ${a.accent}30`, display:"flex", alignItems:"center", justifyContent:"center", color:a.accent, flexShrink:0 }}>
+                          {a.icon}
+                        </div>
+                        <div style={{ minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:"#fafafa", marginBottom:2 }}>{a.label}</div>
+                          <div style={{ fontSize:11, color:"#71717a" }}>{a.sub}</div>
+                        </div>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3f3f46" strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink:0, marginLeft:"auto" }}><path d="M9 18l6-6-6-6"/></svg>
+                      </>
+                    );
+                    return a.isLink ? (
+                      <Link key={a.label} href={a.href} style={cardStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>{inner}</Link>
+                    ) : (
+                      <button key={a.label} style={cardStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}
+                        onClick={() => document.getElementById("all-users")?.scrollIntoView({ behavior:"smooth" })}>
+                        {inner}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {/* all users */}
-                <div style={{ fontSize:9.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".1em", color:"#52525b", marginBottom:12 }}>All Users</div>
+                <div id="all-users" style={{ fontSize:9.5, fontWeight:700, textTransform:"uppercase", letterSpacing:".1em", color:"#52525b", marginBottom:12 }}>All Users</div>
                 <div className="users-panel">
                   <div className="users-head">
                     <div className="users-search-wrap">

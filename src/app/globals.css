@@ -516,3 +516,28 @@ canvas { display: block; }
     linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
   background-size: 40px 40px;
 }
+
+/* ── Home page mentor hub cards ───────────────────────────────────────────────── */
+.mentor-hub-card {
+  display: flex; align-items: center; gap: 14px;
+  padding: 18px 20px; background: var(--bg2);
+  border: 1px solid var(--border); border-radius: 14px;
+  text-decoration: none; transition: border-color .18s, background .18s, transform .18s;
+}
+.mentor-hub-card:hover {
+  border-color: rgba(34,211,238,.3); background: rgba(34,211,238,.04);
+  transform: translateY(-2px);
+}
+.mentor-hub-avi {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-d); font-weight: 800; font-size: 18px;
+  flex-shrink: 0;
+}
+.mentor-hub-name {
+  font-family: var(--font-b); font-size: 14px; font-weight: 700;
+  color: var(--text); margin-bottom: 2px;
+}
+.mentor-hub-meta {
+  font-family: var(--font-m); font-size: 10px; color: var(--text3);
+}

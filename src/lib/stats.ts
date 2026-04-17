@@ -1,4 +1,21 @@
-// Client-side stats storage — localStorage only
+// Client-side stats storage — localStorage for offline cache, Supabase for community data
+// To enable community stats/leaderboard, run this SQL in your Supabase dashboard:
+//
+//   create table if not exists game_sessions (
+//     id           uuid primary key default gen_random_uuid(),
+//     user_id      uuid references auth.users(id) on delete cascade,
+//     game_id      text not null,
+//     game_name    text,
+//     mentor_id    text,
+//     duration_ms  integer,
+//     score        integer,
+//     accuracy     real,
+//     created_at   timestamptz default now()
+//   );
+//   alter table game_sessions enable row level security;
+//   create policy "insert own sessions" on game_sessions for insert with check (auth.uid() = user_id);
+//   create policy "read all sessions"   on game_sessions for select using (true);
+//
 const STATS_KEY = "trades-arcade-stats";
 
 export interface GameSession {
@@ -66,4 +83,30 @@ export function avgAccuracyByGame(sessions: GameSession[]): Record<string, numbe
       return [id, withAcc.reduce((sum, s) => sum + s.accuracy!, 0) / withAcc.length];
     })
   );
+}
+
+/**
+ * Write a session to Supabase so it appears in the community leaderboard.
+ * Call this after recordSession() whenever the user is authenticated.
+ * Requires the game_sessions table — see SQL comment at top of file.
+ */
+export async function recordSessionRemote(
+  session: GameSession,
+  userId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabaseClient: { from: (table: string) => any }
+): Promise<void> {
+  try {
+    await supabaseClient.from("game_sessions").insert({
+      user_id:     userId,
+      game_id:     session.gameId,
+      game_name:   session.gameName,
+      mentor_id:   session.mentorId,
+      duration_ms: session.durationMs,
+      score:       session.score ?? null,
+      accuracy:    session.accuracy ?? null,
+    });
+  } catch {
+    // Non-fatal — local session is already saved
+  }
 }
