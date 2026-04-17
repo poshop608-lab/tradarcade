@@ -102,7 +102,9 @@ export default function LoginPage() {
 
         .lp {
           min-height:100vh;
-          background:#07080a;
+          background:radial-gradient(ellipse 120% 80% at 60% -10%, rgba(34,211,238,.07) 0%, transparent 55%),
+                      radial-gradient(ellipse 80% 60% at -10% 80%, rgba(139,92,246,.07) 0%, transparent 55%),
+                      #060709;
           display:flex;
           align-items:center;
           justify-content:center;
@@ -112,19 +114,54 @@ export default function LoginPage() {
           font-family:'Plus Jakarta Sans', var(--font-jakarta), system-ui, sans-serif;
         }
 
-        /* orbs */
-        .lp-orb { position:fixed; border-radius:50%; pointer-events:none; filter:blur(90px); mix-blend-mode:screen; }
-        .lp-orb-1 { width:700px;height:700px;background:radial-gradient(circle,rgba(34,211,238,.2) 0%,transparent 65%);top:-260px;right:-180px;animation:floatA 13s ease-in-out infinite; }
-        .lp-orb-2 { width:600px;height:600px;background:radial-gradient(circle,rgba(168,85,247,.14) 0%,transparent 65%);bottom:-200px;left:-150px;animation:floatB 16s ease-in-out infinite; }
-        .lp-orb-3 { width:380px;height:380px;background:radial-gradient(circle,rgba(244,63,94,.09) 0%,transparent 65%);top:45%;right:8%;animation:floatA 19s ease-in-out 3s infinite; }
+        /* orbs — NO mix-blend-mode so they're visible on dark bg */
+        .lp-orb { position:fixed; border-radius:50%; pointer-events:none; z-index:0; }
+        .lp-orb-1 {
+          width:800px; height:800px;
+          background:radial-gradient(circle, rgba(34,211,238,.18) 0%, rgba(34,211,238,.06) 35%, transparent 65%);
+          filter:blur(70px);
+          top:-320px; right:-200px;
+          animation:floatA 14s ease-in-out infinite;
+        }
+        .lp-orb-2 {
+          width:700px; height:700px;
+          background:radial-gradient(circle, rgba(139,92,246,.16) 0%, rgba(139,92,246,.05) 35%, transparent 65%);
+          filter:blur(80px);
+          bottom:-250px; left:-180px;
+          animation:floatB 17s ease-in-out infinite;
+        }
+        .lp-orb-3 {
+          width:450px; height:450px;
+          background:radial-gradient(circle, rgba(244,63,94,.1) 0%, transparent 65%);
+          filter:blur(60px);
+          top:40%; right:5%;
+          animation:floatA 20s ease-in-out 3s infinite;
+        }
+        .lp-orb-4 {
+          width:300px; height:300px;
+          background:radial-gradient(circle, rgba(34,211,238,.08) 0%, transparent 65%);
+          filter:blur(50px);
+          bottom:10%; right:25%;
+          animation:floatB 11s ease-in-out 6s infinite;
+        }
 
-        /* grid */
+        /* dot grid */
         .lp-grid {
-          position:fixed;inset:0;pointer-events:none;z-index:0;
-          background-image:radial-gradient(circle,rgba(255,255,255,.04) 1px,transparent 1px);
-          background-size:32px 32px;
-          mask-image:radial-gradient(ellipse 70% 70% at 50% 50%,black 0%,transparent 100%);
-          -webkit-mask-image:radial-gradient(ellipse 70% 70% at 50% 50%,black 0%,transparent 100%);
+          position:fixed; inset:0; pointer-events:none; z-index:0;
+          background-image:radial-gradient(circle, rgba(255,255,255,.055) 1px, transparent 1px);
+          background-size:30px 30px;
+          mask-image:radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
+          -webkit-mask-image:radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
+        }
+
+        /* glow lines top & bottom */
+        .lp-glow-top {
+          position:fixed; top:0; left:0; right:0; height:1px; z-index:0; pointer-events:none;
+          background:linear-gradient(90deg, transparent 5%, rgba(34,211,238,.3) 40%, rgba(139,92,246,.25) 60%, transparent 95%);
+        }
+        .lp-glow-bot {
+          position:fixed; bottom:0; left:0; right:0; height:1px; z-index:0; pointer-events:none;
+          background:linear-gradient(90deg, transparent 10%, rgba(139,92,246,.2) 50%, transparent 90%);
         }
 
         /* back button */
@@ -163,16 +200,22 @@ export default function LoginPage() {
 
         /* box */
         .lp-box {
-          background:rgba(12,14,18,.88);
-          border:1px solid rgba(255,255,255,.09);
+          background:rgba(9,10,14,.82);
+          border:1px solid rgba(255,255,255,.1);
           border-radius:22px; padding:2rem;
-          backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
-          box-shadow:0 32px 80px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.04) inset;
+          backdrop-filter:blur(32px); -webkit-backdrop-filter:blur(32px);
+          box-shadow:0 40px 90px rgba(0,0,0,.7),
+                     0 0 0 1px rgba(255,255,255,.05) inset,
+                     0 0 60px rgba(34,211,238,.04);
           position:relative; overflow:hidden;
         }
         .lp-box::before {
           content:''; position:absolute; top:0; left:0; right:0; height:1px;
-          background:linear-gradient(90deg,transparent,rgba(34,211,238,.45),rgba(129,140,248,.3),transparent);
+          background:linear-gradient(90deg,transparent 5%,rgba(34,211,238,.5) 40%,rgba(139,92,246,.35) 60%,transparent 95%);
+        }
+        .lp-box::after {
+          content:''; position:absolute; bottom:0; left:20%; right:20%; height:1px;
+          background:linear-gradient(90deg,transparent,rgba(34,211,238,.12),transparent);
         }
 
         /* tabs */
@@ -298,7 +341,10 @@ export default function LoginPage() {
         <div className="lp-orb lp-orb-1" />
         <div className="lp-orb lp-orb-2" />
         <div className="lp-orb lp-orb-3" />
+        <div className="lp-orb lp-orb-4" />
         <div className="lp-grid" />
+        <div className="lp-glow-top" />
+        <div className="lp-glow-bot" />
 
         {/* Back to landing */}
         <a href="/tradegame.html" className="lp-back">
