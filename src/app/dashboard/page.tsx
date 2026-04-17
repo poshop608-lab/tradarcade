@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import MentorshipsTab from "./mentorships-tab";
 import type { User } from "@supabase/supabase-js";
 import {
   getSessions, totalTimePlayed, sessionsByGame,
@@ -211,15 +212,16 @@ const CATS = [
 
 const DIFF_COLOR: Record<string, string> = { Easy:"#22c55e", Medium:"#f59e0b", Hard:"#f43f5e" };
 
-type Tab = "games" | "leaderboard" | "stats" | "admin";
+type Tab = "games" | "leaderboard" | "stats" | "mentorships" | "admin";
 
 // ── nav SVGs ──────────────────────────────────────────────────────────────────
 const NAV = {
-  logo:   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round"><path d="M2 12L6 7L9 10L13 4L17 9L21 5"/></svg>,
+  logo:   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><polyline points="2 14 6 9 9 12 13 6 17 10 22 5"/><line x1="2" y1="20" x2="22" y2="20" strokeOpacity=".25"/></svg>,
   games:  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 10v4M10 12h4"/></svg>,
   lb:     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 6H3v16h5V6zM14 2H10v20h4V2zM20 10h-4v12h4V10z"/></svg>,
   stats:  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 5-5"/></svg>,
   admin:  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+  mship:  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>,
   logout: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>,
   play:   <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>,
   search: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>,
@@ -257,14 +259,14 @@ const CSS = `
 .sb-top  { padding:16px 14px 12px; border-bottom:1px solid rgba(255,255,255,.06); }
 .sb-logo { display:flex; align-items:center; gap:9px; text-decoration:none; }
 .sb-mark {
-  width:32px; height:32px; border-radius:9px; flex-shrink:0;
-  background:linear-gradient(135deg,rgba(34,211,238,.18),rgba(217,70,239,.14));
-  border:1px solid rgba(34,211,238,.22);
+  width:34px; height:34px; border-radius:10px; flex-shrink:0;
+  background:linear-gradient(135deg,rgba(34,211,238,.15),rgba(129,140,248,.12));
+  border:1px solid rgba(34,211,238,.2);
   display:flex; align-items:center; justify-content:center;
 }
 .sb-name {
-  font-size:14.5px; font-weight:800; letter-spacing:-.025em;
-  background:linear-gradient(115deg,#67e8f9,#d946ef);
+  font-size:15px; font-weight:800; letter-spacing:-.03em;
+  background:linear-gradient(115deg,#67e8f9 20%,#a5b4fc 80%);
   -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
 }
 
@@ -413,6 +415,13 @@ const CSS = `
 .gc-badges { display:flex; flex-direction:column; align-items:flex-end; gap:5px; position:relative; z-index:1; }
 .gc-cat  { font-size:9.5px; font-weight:700; padding:3px 10px; border-radius:20px; }
 .gc-diff { font-size:9px; font-weight:700; padding:2px 9px; border-radius:20px; background:rgba(255,255,255,.05); }
+.gc-mentor-pick {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:2px 8px; border-radius:20px; font-size:8.5px; font-weight:800;
+  background:linear-gradient(115deg,rgba(34,211,238,.15),rgba(129,140,248,.12));
+  border:1px solid rgba(34,211,238,.3); color:#22d3ee;
+  text-transform:uppercase; letter-spacing:.06em;
+}
 
 /* card body */
 .gc-body { padding:0 22px 20px; flex:1; display:flex; flex-direction:column; gap:8px; }
@@ -541,14 +550,15 @@ export default function DashboardPage() {
   const router = useRouter();
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const [user,     setUser]     = useState<User | null>(null);
-  const [tab,      setTab]      = useState<Tab>("games");
-  const [sessions, setSessions] = useState<GameSession[]>([]);
-  const [filter,   setFilter]   = useState("all");
-  const [search,   setSearch]   = useState("");
-  const [loading,  setLoading]  = useState(true);
-  const [collapsed,setCollapsed]= useState<Record<string,boolean>>({});
-  const [banned,   setBanned]   = useState<Set<string>>(new Set());
+  const [user,           setUser]          = useState<User | null>(null);
+  const [tab,            setTab]           = useState<Tab>("games");
+  const [sessions,       setSessions]      = useState<GameSession[]>([]);
+  const [filter,         setFilter]        = useState("all");
+  const [search,         setSearch]        = useState("");
+  const [loading,        setLoading]       = useState(true);
+  const [collapsed,      setCollapsed]     = useState<Record<string,boolean>>({});
+  const [banned,         setBanned]        = useState<Set<string>>(new Set());
+  const [recommendedIds, setRecommendedIds]= useState<Set<string>>(new Set());
 
   useScrollReveal(contentRef);
 
@@ -565,6 +575,15 @@ export default function DashboardPage() {
     });
     return () => subscription.unsubscribe();
   }, [router]);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("mentorships").select("active_game_ids").eq("is_public", true).then(({ data }) => {
+      if (!data) return;
+      const ids = new Set<string>(data.flatMap(m => m.active_game_ids ?? []));
+      setRecommendedIds(ids);
+    });
+  }, [user]);
 
   async function signOut() { await supabase.auth.signOut(); router.push("/login"); }
 
@@ -598,17 +617,19 @@ export default function DashboardPage() {
   const visCats = CATS.filter(c => visible.some(g => g.cat === c.tag));
 
   const tabs = [
-    { id:"games" as Tab,       label:"Games",       icon:NAV.games },
-    { id:"leaderboard" as Tab, label:"Leaderboard", icon:NAV.lb    },
-    { id:"stats" as Tab,       label:"Statistics",  icon:NAV.stats },
+    { id:"games"        as Tab, label:"Games",        icon:NAV.games },
+    { id:"mentorships"  as Tab, label:"Mentorships",  icon:NAV.mship },
+    { id:"leaderboard"  as Tab, label:"Leaderboard",  icon:NAV.lb    },
+    { id:"stats"        as Tab, label:"Statistics",   icon:NAV.stats },
     ...(mentor ? [{ id:"admin" as Tab, label:"Admin", icon:NAV.admin }] : []),
   ];
 
   const PAGE: Record<Tab,{t:string;s:string}> = {
-    games:       { t:"Game Arcade",  s:`${ALL_GAMES.length} games available` },
-    leaderboard: { t:"Leaderboard",  s:"Your personal best scores"          },
-    stats:       { t:"Statistics",   s:"Your performance overview"          },
-    admin:       { t:"Admin Panel",  s:"Mentor controls & user management"  },
+    games:        { t:"Game Arcade",   s:`${ALL_GAMES.length} games available`   },
+    mentorships:  { t:"Mentorships",   s:"Browse and manage trading communities" },
+    leaderboard:  { t:"Leaderboard",   s:"Your personal best scores"             },
+    stats:        { t:"Statistics",    s:"Your performance overview"             },
+    admin:        { t:"Admin Panel",   s:"Mentor controls & user management"     },
   };
 
   // global card index for stagger offset across all categories
@@ -624,7 +645,7 @@ export default function DashboardPage() {
           <div className="sb-top">
             <Link href="/" className="sb-logo">
               <div className="sb-mark">{NAV.logo}</div>
-              <span className="sb-name">TradArcade</span>
+              <span className="sb-name">TradeArcade</span>
             </Link>
           </div>
           <nav className="sb-nav">
@@ -743,6 +764,12 @@ export default function DashboardPage() {
                                   <div className="gc-badges">
                                     <span className="gc-cat" style={{ background:`${game.accent}18`, border:`1px solid ${game.accent}44`, color:game.accent }}>{game.cat}</span>
                                     <span className="gc-diff" style={{ color:dc }}>{game.diff}</span>
+                                    {recommendedIds.has(game.id) && (
+                                      <span className="gc-mentor-pick">
+                                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                                        Mentor Pick
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                                 {/* body */}
@@ -767,6 +794,16 @@ export default function DashboardPage() {
                   );
                 })}
               </div>
+            )}
+
+            {/* ═══ MENTORSHIPS ═════════════════════ */}
+            {tab==="mentorships" && (
+              <MentorshipsTab
+                key="mship"
+                user={user}
+                isMentor={mentor}
+                displayName={name}
+              />
             )}
 
             {/* ═══ LEADERBOARD ═════════════════════ */}
