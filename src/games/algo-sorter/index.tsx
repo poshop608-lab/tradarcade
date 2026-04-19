@@ -42,12 +42,15 @@ const ALGO_COLORS: Record<AlgoAnswer, string> = {
 };
 
 const ALGO_PATHS: Partial<Record<string, string>> = {
-  "41": ":29 → :41 → cycle ends",
-  "47": ":29 → :47 → biggest Algo 2 moves",
-  "53": ":47 → :53 → Algo 2 CE",
-  "59": ":47 → :53/:56 → :59 → Algo 2 complete",
-  "29": "Starting node — both :29→:41 (A1) and :29→:47 (A2)",
-  "71": "Major reversal zone — both algos end/reverse here",
+  "03": "Reference endpoint — Algo 1 origin, Algo 2 terminal",
+  "11": "Shared node — both :03→:11 (A1) and :53→:11 (A2)",
+  "17": ":11 → :17 → Algo 1 delivery",
+  "29": "Shared anchor — both :29→:41 (A1) and :29→:47 (A2)",
+  "41": ":29 → :41 → Algo 1 terminal",
+  "47": ":29 → :47 → Algo 2 main delivery",
+  "53": ":47 → :53 → Algo 2 CE extension",
+  "59": "Shared — Algo 1: :41→:59→:71 | Algo 2: :53→:59→:03",
+  "71": "Algo 1 terminal — sequence ends at :71 → CE :77",
 };
 
 function buildContext(item: AlgoItem, diff: Difficulty): string | undefined {
@@ -55,30 +58,30 @@ function buildContext(item: AlgoItem, diff: Difficulty): string | undefined {
 
   if (diff === "medium") {
     const contextMap: Record<string, string> = {
+      "03": "Price path starts or ends at :03",
+      "11": "Price path: :03 → :11 (shared node)",
+      "17": "Price path: :11 → :17",
+      "29": "Price stopped at :29 — shared anchor for both algos",
       "41": "Price path: :29 → :41",
       "47": "Price path: :29 → :47",
       "53": "Price path: :47 → :53",
-      "59": "Price path: :53/:56 → :59",
-      "29": "Price stopped at :29 with a sweep",
-      "71": "Price reversed at :71",
-      "17": "Price visited :17",
-      "11": "Price visited :11",
-      "03": "Price found :03",
+      "59": "Price path: :41/:53 → :59 (shared node)",
+      "71": "Price path: :59 → :71 — end of sequence",
     };
     return contextMap[item.number];
   }
 
   // hard: 3-step sequences and tricky framing
   const hardMap: Record<string, string> = {
-    "41": "After :29 sweep → 3-candle swing → price pushed to :41. Algo?",
-    "47": "Open of hour → :29 hits → sweep → price delivers to :47. Algo?",
+    "03": "Algo 1 starts at :03. Algo 2 ends at :03. Which algos use this number?",
+    "11": ":03 → :11 in Algo 1. :53 → :11 in Algo 2. Which algos pass through :11?",
+    "17": ":11 → :17 in Algo 1. Not in Algo 2. Which algo?",
+    "29": "Both :29→:41 (A1) and :29→:47 (A2) start here. Which algos use :29?",
+    "41": "Full path: :03→:11→:17→:29→:41. Algo?",
+    "47": ":29 confirmed, next delivery to :47. CE of which algo?",
     "53": ":47 confirmed, next delivery to :53. CE of which algo?",
-    "59": "Full path: :29 → :47 → :53 → :59 complete. Algo?",
-    "29": "Both :41 and :47 can follow :29. Which algos use this number?",
-    "71": ":29 algo complete, reversal back toward :71. Algo?",
-    "17": "Price retraces through :17 before next delivery. Algo?",
-    "11": "Deep retracement touches :11, then reverses. Algo?",
-    "03": "Extreme retracement to :03 before full expansion. Algo?",
+    "59": "Algo 1: :41→:59→:71. Algo 2: :53→:59→:03. Which algos pass through :59?",
+    "71": "Full Algo 1 path: :03→:11→:17→:29→:41→:59→:71. Algo?",
   };
   return hardMap[item.number] ?? `Price at :${item.number}. Which algo?`;
 }
